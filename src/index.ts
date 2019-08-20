@@ -1,7 +1,6 @@
 import uuid from 'uuid/v4'
 import Busboy from 'busboy'
 import { RedisClient } from 'redis'
-
 import { Request, Response, RequestHandler, NextFunction } from 'express'
 
 import { IBarkeeperConfig } from './structures/interfaces/IBarkeeperConfig'
@@ -12,25 +11,54 @@ export function factory (redisClient: RedisClient, options: IBarkeeperConfig = {
   return [(req: Request, _res: Response, next: NextFunction) => {
     const boy = new Busboy({ headers: req.headers })
 
-    const files: any[] | { key: string; fieldname: string; name: string; encoding: string; mimetype: string; }[] = []
+    const files: any[] | {key: string, fieldname: string, name: string, encoding: string, mimetype: string, size: number }[] = []
 
-    boy.on('file', async (fieldname: string, file: NodeJS.ReadableStream, filename: string, encoding: string, mimetype: string) => {
-      file.resume()
+    let pendingWrites = 0
+
+    boy.on('file', async (fieldname: string, fileStream: NodeJS.ReadableStream, filename: string, encoding: string, mimetype: string): Promise<void> => {
+      if (!filename) {
+        fileStream.resume()
+
+        return
+      }
+
+      const buffersFile: Buffer[] = []
+
+      pendingWrites++
 
       const fileKey = uuid()
 
-      files.push({
-        key: fileKey,
-        fieldname,
-        name: filename,
-        encoding,
-        mimetype
+      fileStream.on('data', chunk => {
+        buffersFile.push(chunk)
       })
 
-      redisClient.set(fileKey, '', 'EX', ttl)
+      fileStream.on('end', () => {
+        const buffer = Buffer.concat(buffersFile)
 
-      file.on('data', chunk => {
-        redisClient.append(fileKey, chunk)
+        redisClient.set(fileKey, buffer.toString(), 'EX', ttl, (err) => {
+          if (err) {
+            next(err)
+
+            return
+          }
+
+          pendingWrites--
+
+          files.push({
+            key: fileKey,
+            fieldname,
+            name: filename,
+            encoding,
+            mimetype,
+            size: buffer.byteLength
+          })
+
+          if (pendingWrites) {
+            return
+          }
+
+          next()
+        })
       })
     })
 
@@ -39,8 +67,6 @@ export function factory (redisClient: RedisClient, options: IBarkeeperConfig = {
         value: (files as any[]),
         writable: false
       })
-
-      next()
     })
 
     req.pipe(boy)
