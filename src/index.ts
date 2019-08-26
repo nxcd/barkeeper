@@ -15,29 +15,63 @@ function drainStream (stream: any) {
   stream.on('readable', stream.read.bind(stream))
 }
 
-function fields (enabledFields: IEnabledFields[] = []) {
-  return {
-    validFields: (files: IRequestFiles[], field: string) => {
-      if (!enabledFields.length) {
-        return
-      }
-
-      const expectedField = enabledFields.find((enabledField: IEnabledFields) => enabledField.field === field)
-
-      if (!expectedField) {
-        const message = format('The field %s is not expected', field)
-        throw boom.badData(message)
-      }
-
-      const { files: filesLimit } = expectedField.limits
-
-      const countFiles = files.filter(({ key }) => key === field).length
-
-      if (countFiles >= filesLimit) {
-        const message = format('The field %s accepts a maximum of %s files', field, filesLimit)
-        throw boom.badData(message)
-      }
+function fields (enabledFields: IEnabledFields[] = [], enabledAdditionalFields: boolean) {
+  function getLimitsByField (field: string) {
+    if (!enabledFields.length) {
+      return
     }
+
+    const expectedField = enabledFields.find((enabledField: IEnabledFields) => enabledField.field === field)
+
+    if (!expectedField) {
+      return
+    }
+
+    return expectedField.limits
+  }
+
+  function validField (field: string) {
+    if (!enabledFields.length) {
+      return
+    }
+
+    const limits = getLimitsByField(field)
+
+    if (limits) {
+      return { limits }
+    }
+
+    if (enabledAdditionalFields) {
+      return
+    }
+
+    const message = format('The field %s is not expected', field)
+
+    throw boom.badData(message)
+  }
+
+  function validMaxFiles (files: IRequestFiles[], field: string) {
+    const isValidField = validField(field)
+
+    if (!isValidField) {
+      return
+    }
+
+    const { files: filesLimit } = isValidField.limits
+
+    const countFiles = files.filter(({ fieldname }) => fieldname === field).length
+
+    if (countFiles < filesLimit) {
+      return
+    }
+
+    const message = format('The field %s accepts a maximum of %s files', field, filesLimit)
+    throw boom.badData(message)
+  }
+
+  return {
+    validField,
+    validMaxFiles
   }
 }
 
@@ -51,9 +85,9 @@ export class Barkeeper {
   }
 
   upload (config: IUploadBarkeeperConfig) {
-    const { busboy: busboyConfig, enabledFields } = config
+    const { busboy: busboyConfig = {}, enabledAdditionalFields = false, enabledFields } = config
 
-    const validator = fields(enabledFields)
+    const validator = fields(enabledFields, enabledAdditionalFields)
 
     return (req: Request, _res: Response, next: NextFunction) => {
       busboyConfig.headers = req.headers
@@ -88,7 +122,7 @@ export class Barkeeper {
         }
 
         try {
-          validator.validFields(files, fieldname)
+          validator.validField(fieldname)
         } catch (err) {
           fileStream.resume()
           return done(err)
@@ -121,6 +155,13 @@ export class Barkeeper {
             }
 
             pendingWrites--
+
+            try {
+              validator.validMaxFiles(files, fieldname)
+            } catch (err) {
+              fileStream.resume()
+              return done(err)
+            }
 
             files.push({
               key: fileKey,
