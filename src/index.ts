@@ -94,7 +94,6 @@ export class Barkeeper {
           return done(err)
         }
 
-
         const buffersFile: Buffer[] = []
 
         pendingWrites++
