@@ -27,6 +27,12 @@ function fields (enabledFields: IEnabledFields[] = [], enabledAdditionalFields: 
       return
     }
 
+    if (!expectedField.limits || !expectedField.limits.files) {
+      return {
+        files: 1 //default
+      }
+    }
+
     return expectedField.limits
   }
 
