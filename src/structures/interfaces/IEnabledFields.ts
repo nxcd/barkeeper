@@ -1,4 +1,5 @@
 export interface IEnabledFields {
   field: string,
-  limits: { files: number }
+  limits: { files: number },
+  mimetypes: string[]
 }

@@ -36,6 +36,20 @@ function fields (enabledFields: IEnabledFields[] = [], enabledAdditionalFields: 
     return expectedField.limits
   }
 
+  function getExpectedMimetypesByField (field: string): string[] | undefined {
+    if (!enabledFields.length) {
+      return
+    }
+
+    const expectedField = enabledFields.find((enabledField: IEnabledFields) => enabledField.field === field)
+
+    if (!expectedField) {
+      return
+    }
+
+    return expectedField.mimetypes
+  }
+
   function validField (field: string) {
     if (!enabledFields.length) {
       return
@@ -52,7 +66,27 @@ function fields (enabledFields: IEnabledFields[] = [], enabledAdditionalFields: 
     }
 
     const message = format('The field %s is not expected', field)
+    throw boom.badData(message)
+  }
 
+  function validMimeTypes (field: string, mimetype: string) {
+    if (!enabledFields.length) {
+      return
+    }
+
+    const expectedMimetypes = getExpectedMimetypesByField(field)
+
+    if (!expectedMimetypes) {
+      return
+    }
+
+    const isValidMimetype = expectedMimetypes.find((expectedMimetype) => expectedMimetype === mimetype)
+
+    if (isValidMimetype) {
+      return
+    }
+
+    const message = `The field ${field} expected on of the following mimetypes: ${expectedMimetypes}`
     throw boom.badData(message)
   }
 
@@ -77,7 +111,8 @@ function fields (enabledFields: IEnabledFields[] = [], enabledAdditionalFields: 
 
   return {
     validField,
-    validMaxFiles
+    validMaxFiles,
+    validMimeTypes
   }
 }
 
@@ -129,6 +164,13 @@ export class Barkeeper {
 
         try {
           validator.validField(fieldname)
+        } catch (err) {
+          fileStream.resume()
+          return done(err)
+        }
+
+        try {
+          validator.validMimeTypes(fieldname, mimetype)
         } catch (err) {
           fileStream.resume()
           return done(err)
