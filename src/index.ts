@@ -21,7 +21,7 @@ function fields (enabledFields: IEnabledFields[] = [], enabledAdditionalFields: 
       return
     }
 
-    const expectedField = enabledFields.find((enabledField: IEnabledFields) => enabledField.field === field) || { limits: generalLimits }
+    const expectedField = enabledFields.find((enabledField: IEnabledFields) => enabledField.field === field)
 
     if (!expectedField) {
       return
@@ -70,11 +70,11 @@ function fields (enabledFields: IEnabledFields[] = [], enabledAdditionalFields: 
   }
 
   function validMimeTypes (field: string, mimetype: string) {
-    if (!enabledFields.length) {
+    if (!enabledFields.length && !generalMimetypes.length) {
       return
     }
 
-    const expectedMimetypes = getExpectedMimetypesByField(field) || !generalMimetypes
+    const expectedMimetypes = enabledFields.length ? getExpectedMimetypesByField(field) : generalMimetypes
 
     if (!expectedMimetypes) {
       return
@@ -86,26 +86,32 @@ function fields (enabledFields: IEnabledFields[] = [], enabledAdditionalFields: 
       return
     }
 
-    const message = `The field ${field} expected on of the following mimetypes: ${expectedMimetypes}`
+    const message = enabledFields.length
+      ? `The field ${field} expected on of the following mimetypes: ${expectedMimetypes}`
+      : `Expected on of the following mimetypes: ${expectedMimetypes}`
+
     throw boom.badData(message)
   }
 
   function validMaxFiles (files: IRequestFiles[], field: string) {
     const isValidField = validField(field)
 
-    if (!isValidField) {
+    if (!isValidField && (!generalLimits || !generalLimits.files)) {
       return
     }
 
-    const { files: filesLimit } = isValidField.limits
+    const { files: filesLimit } = isValidField ? isValidField.limits : generalLimits
 
-    const countFiles = files.filter(({ fieldname }) => fieldname === field).length
+    const countFiles = isValidField ? files.filter(({ fieldname }) => fieldname === field).length : files.length
 
     if (countFiles < filesLimit) {
       return
     }
 
-    const message = format('The field %s accepts a maximum of %s files', field, filesLimit)
+    const message = isValidField
+      ? format('The field %s accepts a maximum of %s files', field, filesLimit)
+      : format('Accepts a maximum of %s files', filesLimit)
+
     throw boom.badData(message)
   }
 
