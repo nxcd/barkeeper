@@ -15,7 +15,7 @@ function drainStream (stream: any) {
   stream.on('readable', stream.read.bind(stream))
 }
 
-function fields (enabledFields: IEnabledFields[] = [], enabledAdditionalFields: boolean) {
+function fields (enabledFields: IEnabledFields[] = [], enabledAdditionalFields: boolean, generalLimits: { files: number }, generalMimetypes: string[]) {
   function getLimitsByField (field: string) {
     if (!enabledFields.length) {
       return
@@ -74,7 +74,7 @@ function fields (enabledFields: IEnabledFields[] = [], enabledAdditionalFields: 
       return
     }
 
-    const expectedMimetypes = getExpectedMimetypesByField(field)
+    const expectedMimetypes = getExpectedMimetypesByField(field) || !generalMimetypes
 
     if (!expectedMimetypes) {
       return
@@ -97,7 +97,7 @@ function fields (enabledFields: IEnabledFields[] = [], enabledAdditionalFields: 
       return
     }
 
-    const { files: filesLimit } = isValidField.limits
+    const { files: filesLimit } = isValidField.limits || generalLimits
 
     const countFiles = files.filter(({ fieldname }) => fieldname === field).length
 
@@ -126,9 +126,9 @@ export class Barkeeper {
   }
 
   upload (config: IUploadBarkeeperConfig) {
-    const { busboy: busboyConfig = {}, enabledAdditionalFields = false, enabledFields } = config
+    const { busboy: busboyConfig = {}, enabledAdditionalFields = false, enabledFields, limits, mimetypes = [] } = config
 
-    const validator = fields(enabledFields, enabledAdditionalFields)
+    const validator = fields(enabledFields, enabledAdditionalFields, limits, mimetypes)
 
     return (req: Request, _res: Response, next: NextFunction) => {
       busboyConfig.headers = req.headers
@@ -148,6 +148,7 @@ export class Barkeeper {
         if ((!error && pendingWrites)) {
           return
         }
+
         req.unpipe(boy)
         drainStream(req)
         boy.removeAllListeners()
