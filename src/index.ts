@@ -21,7 +21,7 @@ function fields (enabledFields: IEnabledFields[] = [], enabledAdditionalFields: 
       return
     }
 
-    const expectedField = enabledFields.find((enabledField: IEnabledFields) => enabledField.field === field)
+    const expectedField = enabledFields.find((enabledField: IEnabledFields) => enabledField.field === field) || { limits: generalLimits }
 
     if (!expectedField) {
       return
@@ -97,7 +97,7 @@ function fields (enabledFields: IEnabledFields[] = [], enabledAdditionalFields: 
       return
     }
 
-    const { files: filesLimit } = isValidField.limits || generalLimits
+    const { files: filesLimit } = isValidField.limits
 
     const countFiles = files.filter(({ fieldname }) => fieldname === field).length
 
