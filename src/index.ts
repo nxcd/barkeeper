@@ -204,7 +204,7 @@ export class Barkeeper {
         fileStream.on('end', () => {
           const buffer = Buffer.concat(buffersFile)
 
-          this._redisClient.set(fileKey, buffer, 'EX', this._ttl, (err) => {
+          this._redisClient.set(fileKey, buffer.toString('base64'), 'EX', this._ttl, (err) => {
             if (err) {
               return done(err)
             }
