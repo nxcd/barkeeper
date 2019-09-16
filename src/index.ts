@@ -1,7 +1,7 @@
 import uuid from 'uuid/v4'
 import Busboy from 'busboy'
 import boom from '@hapi/boom'
-import { RedisClient } from 'redis'
+import { Redis as RedisClient } from 'ioredis'
 import { format } from 'util'
 import { Request, Response, NextFunction } from 'express'
 import onFinished from 'on-finished'
@@ -204,7 +204,7 @@ export class Barkeeper {
         fileStream.on('end', () => {
           const buffer = Buffer.concat(buffersFile)
 
-          this._redisClient.set(fileKey, buffer.toString('base64'), 'EX', this._ttl, (err) => {
+          this._redisClient.set(fileKey, buffer, 'EX', this._ttl, (err) => {
             if (err) {
               return done(err)
             }
