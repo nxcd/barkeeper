@@ -5,7 +5,7 @@ import { Redis as RedisClient } from 'ioredis'
 import { format } from 'util'
 import { Request, Response, NextFunction } from 'express'
 import onFinished from 'on-finished'
-import FileType from'file-type'
+import FileType from 'file-type'
 
 import { IRequestFiles } from './structures/interfaces/IRequestFiles'
 import { IEnabledFields } from './structures/interfaces/IEnabledFields'
