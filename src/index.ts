@@ -5,6 +5,7 @@ import { Redis as RedisClient } from 'ioredis'
 import { format } from 'util'
 import { Request, Response, NextFunction } from 'express'
 import onFinished from 'on-finished'
+import FileType from'file-type'
 
 import { IRequestFiles } from './structures/interfaces/IRequestFiles'
 import { IEnabledFields } from './structures/interfaces/IEnabledFields'
@@ -162,6 +163,52 @@ export class Barkeeper {
         isDone = true
       }
 
+      boy.on('field', async (fieldname: string, fieldValue: string): Promise<void> => {
+        if (!fieldname || !fieldValue) {
+          return
+        }
+
+        try {
+          validator.validField(fieldname)
+        } catch (err) {
+          return done(err)
+        }
+
+        const buffer = Buffer.from(fieldValue, 'base64')
+        const { mime: mimetype = '' } = await FileType.fromBuffer(buffer) || {}
+
+        try {
+          validator.validMimeTypes(fieldname, mimetype)
+        } catch (err) {
+          return done(err)
+        }
+
+        const fileKey = uuid()
+
+        this._redisClient.set(fileKey, fieldValue, 'EX', this._ttl, (err) => {
+          if (err) {
+            return done(err)
+          }
+
+          try {
+            validator.validMaxFiles(files, fieldname)
+          } catch (err) {
+            return done(err)
+          }
+
+          files.push({
+            key: fileKey,
+            fieldname,
+            name: 'filename',
+            encoding: 'base64',
+            mimetype,
+            size: buffer.byteLength
+          })
+
+          done()
+        })
+      })
+
       boy.on('file', async (fieldname: string, fileStream: NodeJS.ReadableStream, filename: string, encoding: string, mimetype: string): Promise<void> => {
         if (!filename) {
           fileStream.resume()
@@ -247,7 +294,7 @@ export class Barkeeper {
           writable: false
         })
 
-        done()
+        // done()
       })
 
       req.pipe(boy)

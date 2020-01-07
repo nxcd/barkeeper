@@ -17,7 +17,7 @@ const redis = require('redis')
 const express = require('express')
 
 // Import barkeeper
-const { factory: barkeeperFactory } = require('@nxcd/barkeeper')
+const { Barkeeper } = require('@nxcd/barkeeper')
 
 const redisClient = redis.createClient({ return_buffers: true }) // To save
 
@@ -25,11 +25,11 @@ const config = {
   ttl: 360 // Time to redis key expire in seconds
 }
 
-const barkeeper = barkeeperFactory(redisClient,config)
+const barkeeper = barkeeperFactory(redisClient, config)
 
 const app = express()
 
-app.post('/file', barkeeper, (req, res, next) => {
+app.post('/file', barkeeper.upload({}), (req, res, next) => {
   // req.files is an array of files
 })
 ```
