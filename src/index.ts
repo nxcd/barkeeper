@@ -140,7 +140,15 @@ export class Barkeeper {
     return (req: Request, _res: Response, next: NextFunction) => {
       busboyConfig.headers = req.headers
 
-      const boy = new Busboy(busboyConfig)
+      let boy: any
+
+      try {
+        boy = new Busboy(busboyConfig)
+      } catch (err) {
+        drainStream(req)
+        onFinished(req, () => next(boom.unsupportedMediaType(err.message)))
+        return
+      }
 
       const files: IRequestFiles[] = []
 
