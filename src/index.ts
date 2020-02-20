@@ -182,6 +182,8 @@ export class Barkeeper {
           return done(err)
         }
 
+        pendingWrites++
+
         const buffer = Buffer.from(fieldValue, 'base64')
         const { mime: mimetype = '' } = await FileType.fromBuffer(buffer) || {}
 
@@ -197,6 +199,8 @@ export class Barkeeper {
           if (err) {
             return done(err)
           }
+
+          pendingWrites--
 
           try {
             validator.validMaxFiles(files, fieldname)
