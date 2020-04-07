@@ -167,6 +167,12 @@ export class Barkeeper {
         req.unpipe(boy)
         drainStream(req)
         boy.removeAllListeners()
+
+        Object.defineProperty(req, 'files', {
+          value: (files as any[]),
+          writable: false
+        })
+
         onFinished(req, () => next(error))
         isDone = true
       }
@@ -301,12 +307,12 @@ export class Barkeeper {
       boy.on('fieldsLimit', () => { done(boom.entityTooLarge('To many fields', { code: 'LIMIT_FIELD_COUNT' })) })
 
       boy.on('finish', () => {
-        Object.defineProperty(req, 'files', {
-          value: (files as any[]),
-          writable: false
-        })
+        // Object.defineProperty(req, 'files', {
+        //   value: (files as any[]),
+        //   writable: false
+        // })
 
-        // done()
+        done()
       })
 
       req.pipe(boy)
