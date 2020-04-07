@@ -39,11 +39,10 @@ app.post('/file', barkeeper.upload({}), (req, res, next) => {
 ### Files information
 Files contains an array of objects, each file contains the following information:
 
-Key | Description
---- | --- | ---
-`key` | Key to identify in redis
-`fieldname` | Field name specified in the form
-`name` | Name of the file on the user's computer
-`encoding` | Encoding type of the file
-`mimetype` | Mime type of the file
-
+| Key           | Description                             |
+| ------------- |-----------------------------------------|
+|`key`          | Key to identify in redis                |
+|`fieldname`    | Field name specified in the form        |
+|`name`         | Name of the file on the user's computer |
+|`encoding`     | Encoding type of the file               |
+|`mimetype`     | Mime type of the file                   |
