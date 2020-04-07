@@ -307,11 +307,6 @@ export class Barkeeper {
       boy.on('fieldsLimit', () => { done(boom.entityTooLarge('To many fields', { code: 'LIMIT_FIELD_COUNT' })) })
 
       boy.on('finish', () => {
-        // Object.defineProperty(req, 'files', {
-        //   value: (files as any[]),
-        //   writable: false
-        // })
-
         done()
       })
 
