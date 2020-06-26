@@ -12,6 +12,48 @@ import { IEnabledFields } from './structures/interfaces/IEnabledFields'
 import { IBarkeeperConfig } from './structures/interfaces/IBarkeeperConfig'
 import { IUploadBarkeeperConfig } from './structures/interfaces/IUploadBarkeeperConfig'
 
+function jsonMiddleware (redisClient: RedisClient, ttl: number, config: IUploadBarkeeperConfig) {
+  return (req: Request, _res: Response, next: NextFunction) => {
+    const { bodyFieldName = 'base64' } = config || {}
+
+    if (!req.body || !req.body[bodyFieldName] || typeof req.body[bodyFieldName] !== 'string') {
+      next(boom.notAcceptable(`Invalid payload. To json request use \"${bodyFieldName}\" field`))
+    }
+
+    const file = req.body[bodyFieldName]
+
+    const fileKey = uuid()
+
+    const buffer = Buffer.from(file, 'base64')
+
+    FileType.fromBuffer(buffer)
+      .then((fileTypeResult) => {
+        redisClient.set(fileKey, file, 'EX', ttl, (err) => {
+          if (err) {
+            return next(err)
+          }
+
+          Object.defineProperty(req, 'files', {
+            value: [{
+              key: fileKey,
+              fieldname: bodyFieldName,
+              name: 'filename',
+              encoding: 'base64',
+              mimetype: fileTypeResult ? fileTypeResult.mime : '',
+              size: buffer.byteLength
+            }],
+            writable: false
+          })
+
+          next()
+        })
+      })
+      .catch((err) => {
+        next(err)
+      })
+  }
+}
+
 function drainStream (stream: any) {
   stream.on('readable', stream.read.bind(stream))
 }
@@ -137,7 +179,13 @@ export class Barkeeper {
 
     const validator = fields(enabledFields, enabledAdditionalFields, limits, mimetypes)
 
-    return (req: Request, _res: Response, next: NextFunction) => {
+    return async (req: Request, res: Response, next: NextFunction) => {
+      if (req.headers['content-type'] === 'application/json' && config.mimetypes.includes('application/json')) {
+        jsonMiddleware(this._redisClient, this._ttl, config)(req, res, next)
+
+        return
+      }
+
       busboyConfig.headers = req.headers
 
       let boy: any

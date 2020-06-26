@@ -5,5 +5,6 @@ export interface IUploadBarkeeperConfig {
   enabledFields?: IEnabledFields[],
   enabledAdditionalFields?: boolean,
   limits: { files: number },
-  mimetypes: string[]
+  mimetypes: string[],
+  bodyFieldName?: string
 }
