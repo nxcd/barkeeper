@@ -180,7 +180,7 @@ export class Barkeeper {
     const validator = fields(enabledFields, enabledAdditionalFields, limits, mimetypes)
 
     return async (req: Request, res: Response, next: NextFunction) => {
-      if (req.headers['content-type'] === 'application/json' && config.mimetypes.includes('application/json')) {
+      if (req.headers['content-type'] && req.headers['content-type'].includes('application/json') && config.mimetypes.includes('application/json')) {
         jsonMiddleware(this._redisClient, this._ttl, config)(req, res, next)
 
         return
