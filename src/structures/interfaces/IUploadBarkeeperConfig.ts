@@ -6,5 +6,6 @@ export interface IUploadBarkeeperConfig {
   enabledAdditionalFields?: boolean,
   limits: { files: number },
   mimetypes: string[],
-  bodyFieldName?: string
+  bodyBase64FieldName?: string,
+  bodyUrlFieldName?: string
 }

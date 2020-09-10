@@ -6,49 +6,93 @@ import { format } from 'util'
 import { Request, Response, NextFunction } from 'express'
 import onFinished from 'on-finished'
 import FileType from 'file-type'
+import axios from 'axios'
 
 import { IRequestFiles } from './structures/interfaces/IRequestFiles'
 import { IEnabledFields } from './structures/interfaces/IEnabledFields'
 import { IBarkeeperConfig } from './structures/interfaces/IBarkeeperConfig'
 import { IUploadBarkeeperConfig } from './structures/interfaces/IUploadBarkeeperConfig'
 
+async function getBufferFromInput (inputType: 'base64' | 'urls', fileContent: string): Promise<Buffer> {
+  if (inputType === 'base64') {
+    return Buffer.from(fileContent, 'base64')
+  }
+
+  const { data } = await axios.get(fileContent, {
+    responseType: 'arraybuffer'
+  })
+
+  return Buffer.from(data, 'base64')
+}
+
+function getFilesFromBody (inputType: 'base64' | 'urls', bodyUrlFieldName: string, bodyBase64FieldName: string, requestBody: any): Array<Object> {
+  if (requestBody && inputType === 'urls') {
+    return requestBody[bodyUrlFieldName]
+  }
+
+  if (Array.isArray(requestBody[bodyBase64FieldName])) {
+    return requestBody[bodyBase64FieldName]
+  }
+
+  return [{
+    base64: requestBody[bodyBase64FieldName]
+  }]
+}
+
 function jsonMiddleware (redisClient: RedisClient, ttl: number, config: IUploadBarkeeperConfig) {
   return (req: Request, _res: Response, next: NextFunction) => {
-    const { bodyFieldName = 'base64' } = config || {}
+    const { bodyBase64FieldName = 'base64', bodyUrlFieldName = 'urls' } = config || {}
 
-    if (!req.body || !req.body[bodyFieldName] || typeof req.body[bodyFieldName] !== 'string') {
-      next(boom.notAcceptable(`Invalid payload. To json request use \"${bodyFieldName}\" field`))
+    if (!req.body || (!req.body[bodyBase64FieldName] && !req.body[bodyUrlFieldName])) {
+      return next(boom.notAcceptable(`Invalid payload. To json request use \"${bodyBase64FieldName}\" or \"${bodyUrlFieldName}\" fields`))
     }
 
-    const file = req.body[bodyFieldName]
+    const inputType = req.body[bodyBase64FieldName]
+      ? 'base64'
+      : 'urls'
 
-    const fileKey = uuid()
+    if (inputType === 'base64' && typeof req.body[bodyBase64FieldName] !== 'string' && !Array.isArray(req.body[bodyBase64FieldName])) {
+      return next(boom.notAcceptable(`Invalid payload. To base64 request use \"${bodyBase64FieldName}\" field to send a valid base64`))
+    }
 
-    const buffer = Buffer.from(file, 'base64')
+    if (inputType === 'urls' && !Array.isArray(req.body[bodyUrlFieldName])) {
+      return next(boom.notAcceptable(`Invalid payload. To urls request use \"${bodyUrlFieldName}\" field to send a valid array of image urls`))
+    }
 
-    FileType.fromBuffer(buffer)
-      .then((fileTypeResult) => {
-        redisClient.set(fileKey, file, 'EX', ttl, (err) => {
-          if (err) {
-            return next(err)
-          }
+    const files = getFilesFromBody(inputType, bodyUrlFieldName, bodyBase64FieldName, req.body)
 
-          Object.defineProperty(req, 'files', {
-            value: [{
-              key: fileKey,
-              fieldname: bodyFieldName,
-              name: 'filename',
-              encoding: 'base64',
-              mimetype: fileTypeResult ? fileTypeResult.mime : '',
-              size: buffer.byteLength
-            }],
-            writable: false
-          })
+    const filesPromises = files.map(async (file: any) => {
+      const fileKey = uuid()
 
-          next()
+      const fieldName: any = Object.keys(file)[0]
+
+      const fileContent = file[fieldName]
+      const buffer = await getBufferFromInput(inputType, fileContent)
+
+      const fileTypeResult = await FileType.fromBuffer(buffer)
+
+      await redisClient.set(fileKey, buffer.toString('base64'), 'EX', ttl)
+
+      return {
+        key: fileKey,
+        fieldname: fieldName,
+        name: fieldName,
+        encoding: 'base64',
+        mimetype: fileTypeResult ? fileTypeResult.mime : '',
+        size: buffer.byteLength
+      }
+    })
+
+    Promise.all(filesPromises)
+      .then((files) => {
+        Object.defineProperty(req, 'files', {
+          value: files,
+          writable: false
         })
+
+        next()
       })
-      .catch((err) => {
+      .catch((err: any) => {
         next(err)
       })
   }
