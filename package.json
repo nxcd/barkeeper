@@ -1,6 +1,6 @@
 {
   "name": "@nxcd/barkeeper",
-  "version": "4.2.0",
+  "version": "4.3.0",
   "description": "A middleware express for handling multipart/form-data to redis",
   "main": "dist/index.js",
   "scripts": {
