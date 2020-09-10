@@ -25,18 +25,24 @@ async function getBufferFromInput (inputType: 'base64' | 'urls', fileContent: st
   return Buffer.from(data, 'base64')
 }
 
-function getFilesFromBody (inputType: 'base64' | 'urls', bodyUrlFieldName: string, bodyBase64FieldName: string, requestBody: any): Array<Object> {
-  if (requestBody && inputType === 'urls') {
-    return requestBody[bodyUrlFieldName]
+function getFilesFromBody (inputType: 'base64' | 'urls', bodyUrlFieldName: string, bodyBase64FieldName: string, requestBody: any): Array<{ fieldName: string, fileContent: string }> {
+  const input = inputType === 'base64'
+    ? requestBody[bodyBase64FieldName]
+    : requestBody[bodyUrlFieldName]
+
+  if (typeof input === 'string') {
+    return [{
+      fieldName: inputType,
+      fileContent: input
+    }]
   }
 
-  if (Array.isArray(requestBody[bodyBase64FieldName])) {
-    return requestBody[bodyBase64FieldName]
-  }
-
-  return [{
-    base64: requestBody[bodyBase64FieldName]
-  }]
+  return Object.keys(input).map((inputKey) => {
+    return {
+      fieldName: inputKey,
+      fileContent: input[inputKey]
+    }
+  })
 }
 
 function jsonMiddleware (redisClient: RedisClient, ttl: number, config: IUploadBarkeeperConfig) {
@@ -51,22 +57,11 @@ function jsonMiddleware (redisClient: RedisClient, ttl: number, config: IUploadB
       ? 'base64'
       : 'urls'
 
-    if (inputType === 'base64' && typeof req.body[bodyBase64FieldName] !== 'string' && !Array.isArray(req.body[bodyBase64FieldName])) {
-      return next(boom.notAcceptable(`Invalid payload. To base64 request use \"${bodyBase64FieldName}\" field to send a valid base64`))
-    }
-
-    if (inputType === 'urls' && !Array.isArray(req.body[bodyUrlFieldName])) {
-      return next(boom.notAcceptable(`Invalid payload. To urls request use \"${bodyUrlFieldName}\" field to send a valid array of image urls`))
-    }
-
     const files = getFilesFromBody(inputType, bodyUrlFieldName, bodyBase64FieldName, req.body)
 
-    const filesPromises = files.map(async (file: any) => {
+    const filesPromises = files.map(async ({ fieldName, fileContent }) => {
       const fileKey = uuid()
 
-      const fieldName: any = Object.keys(file)[0]
-
-      const fileContent = file[fieldName]
       const buffer = await getBufferFromInput(inputType, fileContent)
 
       const fileTypeResult = await FileType.fromBuffer(buffer)
