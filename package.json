@@ -27,7 +27,7 @@
   },
   "devDependencies": {
     "husky": "^3.0.3",
-    "standard": "^14.3.3",
+    "standard": "^14.3.4",
     "tslint": "^6.1.1",
     "tslint-config-standard": "^9.0.0",
     "tslint-eslint-rules": "^5.4.0",
