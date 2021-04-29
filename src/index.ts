@@ -162,11 +162,6 @@ function fields (enabledFields: IEnabledFields[] = [], enabledAdditionalFields: 
       return
     }
 
-    console.log('\n\n\n\n\n')
-    console.log(expectedMimetypes)
-    console.log('\n\n\n\n\n')
-    console.log(mimetype)
-
     const isValidMimetype = expectedMimetypes.find((expectedMimetype) => mimetype.includes(expectedMimetype))
 
     if (isValidMimetype) {

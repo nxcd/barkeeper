@@ -34,7 +34,8 @@
     "typescript": "^3.5.3"
   },
   "dependencies": {
-    "@hapi/boom": "^7.4.3",
+    "@hapi/boom": "^7.4.11",
+    "@types/axios": "^0.14.0",
     "@types/busboy": "^0.2.3",
     "@types/express": "^4.17.0",
     "@types/hapi__boom": "^7.4.1",
