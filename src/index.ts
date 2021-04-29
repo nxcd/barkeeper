@@ -162,7 +162,7 @@ function fields (enabledFields: IEnabledFields[] = [], enabledAdditionalFields: 
       return
     }
 
-    const isValidMimetype = expectedMimetypes.find((expectedMimetype) => expectedMimetype === mimetype)
+    const isValidMimetype = expectedMimetypes.find((expectedMimetype) => mimetype.includes(expectedMimetype))
 
     if (isValidMimetype) {
       return
