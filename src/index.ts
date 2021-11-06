@@ -13,16 +13,31 @@ import { IEnabledFields } from './structures/interfaces/IEnabledFields'
 import { IBarkeeperConfig } from './structures/interfaces/IBarkeeperConfig'
 import { IUploadBarkeeperConfig } from './structures/interfaces/IUploadBarkeeperConfig'
 
+import { CannotGetFileFromURLError } from './errors/CannotGetFileFromURLError'
+
 async function getBufferFromInput (inputType: 'base64' | 'urls', fileContent: string): Promise<Buffer> {
   if (inputType === 'base64') {
     return Buffer.from(fileContent, 'base64')
   }
 
-  const { data } = await axios.get(fileContent, {
-    responseType: 'arraybuffer'
-  })
+  try {
+    const { data } = await axios.get(fileContent, {
+      responseType: 'arraybuffer'
+    })
 
-  return Buffer.from(data, 'base64')
+    return Buffer.from(data, 'base64')
+  } catch (error) {
+    const errorMessage = `Cannot download file from url ${fileContent}. Verify the URL and try again.`
+
+    if (axios.isAxiosError(error)) {
+      console.error(`Barkeeper error to download file from url ${fileContent}`, error?.response?.status, error.response?.data)
+
+      throw new CannotGetFileFromURLError(`${errorMessage} ${error?.response?.status} - ${error.response?.data}`)
+    }
+
+
+    throw new CannotGetFileFromURLError(errorMessage)
+  }
 }
 
 function getFilesFromBody (inputType: 'base64' | 'urls', bodyUrlFieldName: string, bodyBase64FieldName: string, requestBody: any): Array<{ fieldName: string, fileContent: string }> {
@@ -97,6 +112,11 @@ function jsonMiddleware (redisClient: RedisClient, ttl: number, config: IUploadB
         next()
       })
       .catch((err: any) => {
+        if (err instanceof CannotGetFileFromURLError) {
+          console.log('dasdhdasdhasdsadaos')
+          return next(boom.notAcceptable(err.message))
+        }
+
         next(err)
       })
   }
