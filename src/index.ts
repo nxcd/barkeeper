@@ -242,7 +242,11 @@ export class Barkeeper {
         boy = new Busboy(busboyConfig)
       } catch (err) {
         drainStream(req)
-        onFinished(req, () => next(boom.unsupportedMediaType(err.message)))
+
+        const errorMessage = err instanceof Error ? err.message : 'Failed to do something exceptional'
+
+        onFinished(req, () => next(boom.unsupportedMediaType(errorMessage)))
+
         return
       }
 
