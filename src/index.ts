@@ -113,7 +113,6 @@ function jsonMiddleware (redisClient: RedisClient, ttl: number, config: IUploadB
       })
       .catch((err: any) => {
         if (err instanceof CannotGetFileFromURLError) {
-          console.log('dasdhdasdhasdsadaos')
           return next(boom.notAcceptable(err.message))
         }
 
