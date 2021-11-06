@@ -1,12 +1,12 @@
-import uuid from 'uuid/v4'
+import axios from 'axios'
 import Busboy from 'busboy'
 import boom from '@hapi/boom'
-import { Redis as RedisClient } from 'ioredis'
 import { format } from 'util'
-import { Request, Response, NextFunction } from 'express'
-import onFinished from 'on-finished'
 import FileType from 'file-type'
-import axios from 'axios'
+import { createHash } from 'crypto'
+import onFinished from 'on-finished'
+import { Redis as RedisClient } from 'ioredis'
+import { Request, Response, NextFunction } from 'express'
 
 import { IRequestFiles } from './structures/interfaces/IRequestFiles'
 import { IEnabledFields } from './structures/interfaces/IEnabledFields'
@@ -45,6 +45,15 @@ function getFilesFromBody (inputType: 'base64' | 'urls', bodyUrlFieldName: strin
   })
 }
 
+function generateSHA256 (buffer: Buffer): string {
+  const sha256Hasher = createHash('sha256')
+
+  const sha256 = sha256Hasher.update(buffer)
+    .digest('hex')
+
+  return sha256
+}
+
 function jsonMiddleware (redisClient: RedisClient, ttl: number, config: IUploadBarkeeperConfig) {
   return (req: Request, _res: Response, next: NextFunction) => {
     const { bodyBase64FieldName = 'base64', bodyUrlFieldName = 'urls' } = config || {}
@@ -60,9 +69,9 @@ function jsonMiddleware (redisClient: RedisClient, ttl: number, config: IUploadB
     const files = getFilesFromBody(inputType, bodyUrlFieldName, bodyBase64FieldName, req.body)
 
     const filesPromises = files.map(async ({ fieldName, fileContent }) => {
-      const fileKey = uuid()
-
       const buffer = await getBufferFromInput(inputType, fileContent)
+
+      const fileKey = generateSHA256(buffer)
 
       const fileTypeResult = await FileType.fromBuffer(buffer)
 
@@ -286,7 +295,7 @@ export class Barkeeper {
           return done(err)
         }
 
-        const fileKey = uuid()
+        const fileKey = generateSHA256(buffer)
 
         this._redisClient.set(fileKey, fieldValue, 'EX', this._ttl, (err) => {
           if (err) {
@@ -339,8 +348,6 @@ export class Barkeeper {
 
         pendingWrites++
 
-        const fileKey = uuid()
-
         fileStream.on('data', chunk => {
           buffersFile.push(chunk)
         })
@@ -355,6 +362,8 @@ export class Barkeeper {
 
         fileStream.on('end', () => {
           const buffer = Buffer.concat(buffersFile)
+
+          const fileKey = generateSHA256(buffer)
 
           this._redisClient.set(fileKey, buffer.toString('base64'), 'EX', this._ttl, (err) => {
             if (err) {
