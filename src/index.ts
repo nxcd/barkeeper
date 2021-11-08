@@ -97,7 +97,8 @@ function jsonMiddleware (redisClient: RedisClient, ttl: number, config: IUploadB
         fieldname: fieldName,
         name: fieldName,
         encoding: 'base64',
-        mimetype: fileTypeResult ? fileTypeResult.mime : '',
+        mimetype: fileTypeResult?.mime,
+        ext: fileTypeResult?.ext,
         size: buffer.byteLength
       }
     })
@@ -310,7 +311,7 @@ export class Barkeeper {
         pendingWrites++
 
         const buffer = Buffer.from(fieldValue, 'base64')
-        const { mime: mimetype = '' } = await FileType.fromBuffer(buffer) || {}
+        const { mime: mimetype = '', ext } = await FileType.fromBuffer(buffer) || {}
 
         try {
           validator.validMimeTypes(fieldname, mimetype)
@@ -339,6 +340,7 @@ export class Barkeeper {
             name: 'filename',
             encoding: 'base64',
             mimetype,
+            ext,
             size: buffer.byteLength
           })
 
@@ -383,10 +385,11 @@ export class Barkeeper {
           done(boom.entityTooLarge('file too large', { code: 'LIMIT_FILE_SIZE' }))
         })
 
-        fileStream.on('end', () => {
+        fileStream.on('end', async () => {
           const buffer = Buffer.concat(buffersFile)
 
           const fileKey = generateSHA256(buffer)
+          const { ext } = await FileType.fromBuffer(buffer) || {}
 
           this._redisClient.set(fileKey, buffer.toString('base64'), 'EX', this._ttl, (err) => {
             if (err) {
@@ -408,7 +411,8 @@ export class Barkeeper {
               name: filename,
               encoding,
               mimetype,
-              size: buffer.byteLength
+              size: buffer.byteLength,
+              ext
             })
 
             if (pendingWrites) {
