@@ -15,9 +15,38 @@ import { IUploadBarkeeperConfig } from './structures/interfaces/IUploadBarkeeper
 
 import { CannotGetFileFromURLError } from './errors/CannotGetFileFromURLError'
 
-async function getBufferFromInput (inputType: 'base64' | 'urls', fileContent: string): Promise<Buffer> {
+async function getBufferFromInput (inputType: 'base64' | 'urls', fileContent: string): Promise<{buffer: Buffer, fileTypeResult: { mime: string, ext: string } | undefined}> {
   if (inputType === 'base64') {
-    return Buffer.from(fileContent, 'base64')
+    const [base64, header] = fileContent
+      .split(',')
+      .reverse()
+
+    const buffer = Buffer.from(base64, 'base64')
+
+    if (header) {
+      const mime = header
+        .replace('data:', '')
+        .replace(';base64', '')
+
+      const extDict = new Map<string, string>([
+        ['image/jpeg', 'jpg'],
+        ['image/png', 'png'],
+        ['image/pdf', 'pdf']
+      ])
+
+      return {
+        buffer,
+        fileTypeResult: {
+          mime,
+          ext: extDict.get(mime) ?? ''
+        }
+      }
+    }
+
+    return {
+      buffer,
+      fileTypeResult: await FileType.fromBuffer(buffer)
+    }
   }
 
   try {
@@ -25,7 +54,12 @@ async function getBufferFromInput (inputType: 'base64' | 'urls', fileContent: st
       responseType: 'arraybuffer'
     })
 
-    return Buffer.from(data, 'base64')
+    const buffer = Buffer.from(data, 'base64')
+    const fileTypeResult = await FileType.fromBuffer(buffer)
+    return {
+      buffer,
+      fileTypeResult
+    }
   } catch (error) {
     const errorMessage = `Cannot download file from url ${fileContent}. Verify the URL and try again.`
 
@@ -84,11 +118,9 @@ function jsonMiddleware (redisClient: RedisClient, ttl: number, config: IUploadB
     const files = getFilesFromBody(inputType, bodyUrlFieldName, bodyBase64FieldName, req.body)
 
     const filesPromises = files.map(async ({ fieldName, fileContent }) => {
-      const buffer = await getBufferFromInput(inputType, fileContent)
+      const { buffer, fileTypeResult } = await getBufferFromInput(inputType, fileContent)
 
       const fileKey = generateSHA256(buffer)
-
-      const fileTypeResult = await FileType.fromBuffer(buffer)
 
       await redisClient.set(fileKey, buffer.toString('base64'), 'EX', ttl)
 
